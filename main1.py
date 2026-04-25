@@ -15,8 +15,8 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Данные MTProto прокси
-PROXY_HOST = "127.0.0.1"
-PROXY_PORT = 1444
+PROXY_HOST = os.getenv("PROXY_HOST")
+PROXY_PORT = os.getenv("PROXY_PORT")
 PROXY_SECRET = os.getenv("PROXY_SECRET")
 
 # Создаём клиента Telethon
