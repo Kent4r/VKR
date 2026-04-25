@@ -16,8 +16,8 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Данные MTProto прокси
 PROXY_HOST = "127.0.0.1"
-PROXY_PORT = 1443
-PROXY_SECRET = "ddb8df1437a86a130fedfa32f1d3810aac"
+PROXY_PORT = 1444
+PROXY_SECRET = os.getenv("PROXY_SECRET")
 
 # Создаём клиента Telethon
 client = TelegramClient(
