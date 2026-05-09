@@ -11,10 +11,10 @@ class DialogOrchestrator:
 
         # Загружаем системный промпт из файла — так сложнее провести prompt injection
         try:
-            with open("prompts/system_prompt.md", encoding="utf-8") as f:
+            with open("system_prompt.md", encoding="utf-8") as f:
                 self.system_prompt = f.read()
         except FileNotFoundError:
-            # Фолбэк на prompts.py если md-файла ещё нет
+            # Фолбэк на prompts.py если md-файла ваще нет
             from prompts import SYSTEM_PROMPT
             self.system_prompt = SYSTEM_PROMPT
 
