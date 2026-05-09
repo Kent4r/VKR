@@ -16,7 +16,7 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Данные MTProto прокси
 PROXY_HOST = os.getenv("PROXY_HOST")
-PROXY_PORT = os.getenv("PROXY_PORT")
+PROXY_PORT = int(os.getenv("PROXY_PORT"))
 PROXY_SECRET = os.getenv("PROXY_SECRET")
 
 # Создаём клиента Telethon
