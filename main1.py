@@ -43,7 +43,7 @@ async def message_handler(event):
     user_id = event.sender_id
     user_text = event.raw_text
 
-    result = await orchestrator.process_message(user_id, user_text)
+    result = await orchestrator.process_message_async(user_id, user_text)
 
     if result["action"] == "escalate":
         await event.reply("⚠️ Сейчас я передам вас живому оператору. Пожалуйста, ожидайте.")

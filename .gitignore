@@ -5,3 +5,5 @@ venv/
 *.docx
 *.doc
 *.pdf
+*.tmp
+*.session
