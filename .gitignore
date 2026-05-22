@@ -8,3 +8,4 @@ venv/
 *.tmp
 *.session
 *.md
+database/

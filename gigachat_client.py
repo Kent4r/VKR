@@ -1,67 +1,85 @@
 # gigachat_client.py
 import os
+import logging
 from dotenv import load_dotenv
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_gigachat import GigaChat
 
 load_dotenv()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class SupportAssistant:
     def __init__(self, docs_path: str = "./database/docs"):
-        # 1. Инициализация модели GigaChat
+        # 1. GigaChat
         self.llm = GigaChat(
             credentials=os.getenv("GIGACHAT_API_KEY"),
             model="GigaChat",
             verify_ssl_certs=False,
-            temperature=0.3,  # Низкая температура для фактологичности
+            temperature=0.3,
             timeout=30
         )
 
-        # 2. Создание и загрузка векторной базы знаний (RAG)
+        # 2. Векторная БД (RAG)
         self.vectorstore = None
         if os.path.exists(docs_path) and any(os.scandir(docs_path)):
-            print("🔄 Загрузка и индексация документов...")
+            logger.info("Загрузка документов из %s", docs_path)
             documents = []
             for file in os.listdir(docs_path):
-                if file.endswith(".txt"):
-                    loader = TextLoader(os.path.join(docs_path, file), encoding='utf-8')
-                elif file.endswith(".pdf"):
-                    loader = PyPDFLoader(os.path.join(docs_path, file))
-                else:
-                    continue
-                documents.extend(loader.load())
-            
-            text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-            docs = text_splitter.split_documents(documents)
-            # Используем бесплатную эмбеддинг-модель
-            embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-            self.vectorstore = Chroma.from_documents(docs, embeddings)
-            print("✅ База знаний готова!")
+                file_path = os.path.join(docs_path, file)
+                try:
+                    if file.endswith(".txt"):
+                        loader = TextLoader(file_path, encoding='utf-8')
+                        documents.extend(loader.load())
+                        logger.info("Загружен TXT: %s", file)
+                    elif file.endswith(".pdf"):
+                        loader = PyPDFLoader(file_path)
+                        documents.extend(loader.load())
+                        logger.info("Загружен PDF: %s", file)
+                    else:
+                        logger.warning("Пропущен файл: %s (не .txt/.pdf)", file)
+                except Exception as e:
+                    logger.error("Ошибка загрузки %s: %s", file, e)
 
-        # 3. Настройка памяти для диалога
+            if not documents:
+                logger.warning("Нет документов для индексации. RAG отключён.")
+            else:
+                # Лучший сплиттер для смешанных документов
+                text_splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=1000,
+                    chunk_overlap=200,
+                    separators=["\n\n", "\n", " ", ""]
+                )
+                docs = text_splitter.split_documents(documents)
+                logger.info("Создано %d чанков", len(docs))
+
+                embeddings = HuggingFaceEmbeddings(
+                    model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+                )
+                self.vectorstore = Chroma.from_documents(docs, embeddings)
+                logger.info("Векторная БД создана")
+        else:
+            logger.warning("Папка %s пуста или не существует. RAG отключён.", docs_path)
+
+        # 3. Память диалога
         self.memory = ConversationBufferWindowMemory(
             memory_key="chat_history",
             return_messages=True,
-            k=5  # Помнить последние 5 обменов сообщениями
+            k=5
         )
 
     def get_response(self, user_message: str) -> str:
-        """Получает ответ от GigaChat, дополняя его контекстом из документации."""
         if not self.vectorstore:
-            # Если БД нет, просто отправляем промпт в GigaChat
-            return self.llm.invoke(user_message)
-        
-        # Создаём цепочку RAG
+            return self.llm.invoke(user_message).content
         qa_chain = ConversationalRetrievalChain.from_llm(
             self.llm,
             retriever=self.vectorstore.as_retriever(search_kwargs={"k": 4}),
             memory=self.memory
         )
-        
         result = qa_chain({"question": user_message})
         return result["answer"]
