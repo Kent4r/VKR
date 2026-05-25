@@ -10,3 +10,4 @@ venv/
 *.md
 database/
 *.pt
+!requirements.txt
