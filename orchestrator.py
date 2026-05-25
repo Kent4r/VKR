@@ -3,6 +3,7 @@ import json
 import asyncio
 from gigachat_client import SupportAssistant
 from vision_analyzer import VisionAnalyzer
+from datetime import datetime
 
 class DialogOrchestrator:
     def __init__(self):
@@ -29,6 +30,12 @@ class DialogOrchestrator:
         full_prompt = (self.system_prompt + "\n\n" + self._format_history(user_id) +
                        f"\nПользователь: {user_message}")
         raw_response = self.assistant.get_response(full_prompt)
+        # Логирование
+        with open("dialog_log.txt", "a", encoding="utf-8") as f:
+            f.write(f"\n{'='*60}\n")
+            f.write(f"User {user_id} at {datetime.now()}\n")
+            f.write(f"Q: {user_message}\n")
+            f.write(f"A: {raw_response[:500]}\n")
         try:
             decision = json.loads(raw_response)
             if decision.get("escalate"):
@@ -44,18 +51,27 @@ class DialogOrchestrator:
 
     # Для медиа 
     def process_photo(self, user_id: int, photo_bytes: bytes, caption: str = "") -> dict:
-        """Анализирует фото и возвращает ответ."""
-        # 1. Анализ изображения
+        # 1. Анализ фото через CV
         analysis = self.vision.analyze_image(photo_bytes)
-        # 2. Формируем текстовое описание для LLM
-        if analysis.get("damage_detected"):
-            desc = f"Пользователь прислал фото. Результат анализа: {analysis.get('description')}"
-        else:
-            desc = f"Пользователь прислал фото. Модуль CV не смог определить повреждение. {analysis.get('message', '')}"
-        # 3. Объединяем с caption (текстом от пользователя)
-        full_text = f"{desc}\nПодпись к фото: {caption}" if caption else desc
-        # 4. Передаём в обычный текстовый обработчик
-        return self._process(user_id, full_text)
+
+        # 2. Формируем текстовое представление того, что увидел CV
+        cv_text = analysis.get("description", "")
+        objects_list = analysis.get("objects", [])
+        if objects_list:
+            obj_descs = []
+            for obj in objects_list:
+                obj_descs.append(f"{obj.get('object')} (уверенность {obj.get('confidence', 0):.2f})")
+            cv_text += f"\nДетектированные объекты: {', '.join(obj_descs)}."
+
+        # 3. Добавляем рекомендацию CV, если есть
+        if analysis.get("recommendation"):
+            cv_text += f"\nРекомендация CV: {analysis['recommendation']}"
+
+        # 4. Объединяем с подписью пользователя
+        full_user_message = f"{cv_text}\n\nСообщение пользователя: {caption}" if caption else cv_text
+
+        # 5. Отправляем в общий текстовый процессор (с RAG)
+        return self._process(user_id, full_user_message)
 
     async def process_photo_async(self, user_id: int, photo_bytes: bytes, caption: str = "") -> dict:
         loop = asyncio.get_event_loop()
