@@ -4,10 +4,13 @@ venv/
 *.txt
 *.docx
 *.doc
-*.pdf
 *.tmp
 *.session
 *.md
 database/
 *.pt
 !requirements.txt
+ФТК-ШАБЛОН (2).pptx
+Методические рекомендации_ВКР.pdf
+Образец_доклада.pdf
+gemini_client.py

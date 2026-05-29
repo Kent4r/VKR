@@ -3,7 +3,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_gigachat import GigaChat
@@ -15,7 +15,7 @@ class SupportAssistant:
     def __init__(self, docs_path: str = "./database/docs"):
         self.llm = GigaChat(
             credentials=os.getenv("GIGACHAT_API_KEY"),
-            model="GigaChat",
+            model="GigaChat-2",
             verify_ssl_certs=False,
             temperature=0.7,   # чуть выше для разнообразия
             timeout=30
