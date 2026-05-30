@@ -27,9 +27,17 @@ class DialogOrchestrator:
         return await loop.run_in_executor(None, self._process, user_id, user_message)
 
     def _process(self, user_id: int, user_message: str) -> dict:
-        full_prompt = (self.system_prompt + "\n\n" + self._format_history(user_id) +
-                       f"\nПользователь: {user_message}")
-        raw_response = self.assistant.get_response(full_prompt)
+        # Получаем историю для этого пользователя (последние 5 обменов)
+        history = self.conversation_history.get(user_id, [])
+        chat_history = [(entry["user"], entry["assistant"]) for entry in history[-5:]]
+
+        # Вызов LLM с системным промптом и историей
+        raw_response = self.assistant.get_response(
+            user_message=user_message,
+            system_prompt=self.system_prompt,
+            chat_history=chat_history
+        )
+
         # Логирование
         with open("dialog_log.txt", "a", encoding="utf-8") as f:
             f.write(f"\n{'='*60}\n")
@@ -51,34 +59,23 @@ class DialogOrchestrator:
 
     # Для медиа 
     def process_photo(self, user_id: int, photo_bytes: bytes, caption: str = "") -> dict:
-        # 1. Анализ фото через CV
         analysis = self.vision.analyze_image(photo_bytes)
-
-        # 2. Формируем текстовое представление того, что увидел CV
         cv_text = analysis.get("description", "")
         objects_list = analysis.get("objects", [])
         if objects_list:
-            obj_descs = []
-            for obj in objects_list:
-                obj_descs.append(f"{obj.get('object')} (уверенность {obj.get('confidence', 0):.2f})")
+            obj_descs = [f"{obj.get('object')} (уверенность {obj.get('confidence', 0):.2f})" for obj in objects_list]
             cv_text += f"\nДетектированные объекты: {', '.join(obj_descs)}."
-
-        # 3. Добавляем рекомендацию CV, если есть
         if analysis.get("recommendation"):
             cv_text += f"\nРекомендация CV: {analysis['recommendation']}"
-
-        # 4. Объединяем с подписью пользователя
         full_user_message = f"{cv_text}\n\nСообщение пользователя: {caption}" if caption else cv_text
-
-        # 5. Отправляем в общий текстовый процессор (с RAG)
         return self._process(user_id, full_user_message)
 
     async def process_photo_async(self, user_id: int, photo_bytes: bytes, caption: str = "") -> dict:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.process_photo, user_id, photo_bytes, caption)
 
+    # --- Видео (сразу эскалация) ---
     def process_video(self, user_id: int, caption: str = "") -> dict:
-        """Видео пока не анализируем – просто эскалируем."""
         return {
             "action": "escalate",
             "reason": "Видеофайл – требуется просмотр оператором",
@@ -88,7 +85,7 @@ class DialogOrchestrator:
     async def process_video_async(self, user_id: int, caption: str = "") -> dict:
         return self.process_video(user_id, caption)
 
-    # --- вспомогательные методы (без изменений) ---
+    # --- Вспомогательные методы ---
     def _format_history(self, user_id: int) -> str:
         history = self.conversation_history.get(user_id, [])
         lines = []
